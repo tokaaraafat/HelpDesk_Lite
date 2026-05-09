@@ -1,4 +1,4 @@
-const statuses = ["Open", "Pending", "In Progress", "Waiting for User", "Resolved", "Closed"];
+const statuses = ["Open", "Pending", "In Progress", "Waiting for User", "Escalated", "Resolved", "Closed"];
 const priorities = ["Low", "Medium", "High", "Urgent"];
 const categories = ["Technical Issue", "Billing", "Account Access", "General Inquiry"];
 
