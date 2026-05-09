@@ -2,8 +2,17 @@ const express = require("express");
 const { STATUSES, PRIORITIES, CATEGORIES } = require("../constants");
 const { authorizeRoles } = require("../middleware/authMiddleware");
 const { getTicketBundle, listTicketBundles, addActivity } = require("../services/ticketService");
+const { processAllTicketsForEscalation } = require("../services/slaService");
 
 const router = express.Router();
+
+/**
+ * Helper function to apply SLA escalation checks to all tickets
+ * This ensures tickets that breach SLA are automatically escalated before being returned
+ */
+function applyEscalationChecks(store) {
+  processAllTicketsForEscalation(store.tickets, 1); // System admin ID = 1
+}
 
 function canViewTicket(user, ticket) {
   if (user.role === "admin" || user.role === "agent") return true;
@@ -16,6 +25,7 @@ router.get("/meta", (req, res) => {
 
 router.get("/", (req, res) => {
   const store = req.app.locals.store;
+  applyEscalationChecks(store); // Check and escalate overdue tickets
   const { role, id } = req.user;
   if (role === "admin" || role === "agent") {
     return res.json(listTicketBundles(store, () => true));
@@ -25,11 +35,13 @@ router.get("/", (req, res) => {
 
 router.get("/assigned/me", authorizeRoles("admin", "agent"), (req, res) => {
   const store = req.app.locals.store;
+  applyEscalationChecks(store); // Check and escalate overdue tickets
   return res.json(listTicketBundles(store, (ticket) => ticket.assignedTo === req.user.id));
 });
 
 router.get("/analytics/summary", authorizeRoles("admin", "agent"), (req, res) => {
   const store = req.app.locals.store;
+  applyEscalationChecks(store); // Check and escalate overdue tickets
   const summary = store.tickets.reduce(
     (acc, ticket) => {
       acc.total += 1;
@@ -56,6 +68,7 @@ router.get("/analytics/summary", authorizeRoles("admin", "agent"), (req, res) =>
 
 router.get("/:id", (req, res) => {
   const store = req.app.locals.store;
+  applyEscalationChecks(store); // Check and escalate overdue tickets
   const ticket = getTicketBundle(store, Number(req.params.id));
   if (!ticket) return res.status(404).json({ message: "Ticket not found" });
   if (!canViewTicket(req.user, ticket)) return res.status(403).json({ message: "Forbidden" });
@@ -64,6 +77,7 @@ router.get("/:id", (req, res) => {
 
 router.post("/", (req, res) => {
   const store = req.app.locals.store;
+  applyEscalationChecks(store); // Check and escalate overdue tickets
   const { title, description, priority, category, attachmentName } = req.body || {};
   if (!title || !description || !priority || !category) {
     return res.status(400).json({ message: "Title, description, priority, and category are required" });
@@ -96,6 +110,7 @@ router.post("/", (req, res) => {
 
 router.put("/:id", (req, res) => {
   const store = req.app.locals.store;
+  applyEscalationChecks(store); // Check and escalate overdue tickets
   const ticket = store.tickets.find((item) => item.id === Number(req.params.id));
   if (!ticket) return res.status(404).json({ message: "Ticket not found" });
 
